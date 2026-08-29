@@ -1,1 +1,314 @@
+/*
+===============================================================================
+Bronze Layer: Quality Checks
+===============================================================================
+Purpose:
+    Validate the completeness, consistency, formatting, and integrity of
+    data loaded into the Bronze layer.
 
+Expected Result:
+    Checks should return no unexpected records unless explicitly stated.
+===============================================================================
+*/
+
+
+-- ============================================================================
+-- Bronze Layer: Row Count Validation
+-- ============================================================================
+
+SELECT 'crm_cust_info' AS table_name, COUNT(*) AS row_count
+FROM silver.crm_cust_info
+
+UNION ALL
+
+SELECT 'crm_prd_info', COUNT(*)
+FROM silver.crm_prd_info
+
+UNION ALL
+
+SELECT 'crm_sales_details', COUNT(*)
+FROM silver.crm_sales_details
+
+UNION ALL
+
+SELECT 'erp_cust_az12', COUNT(*)
+FROM silver.erp_cust_az12
+
+UNION ALL
+
+SELECT 'erp_loc_a101', COUNT(*)
+FROM silver.erp_loc_a101
+
+UNION ALL
+
+SELECT 'erp_px_cat_g1v2', COUNT(*)
+FROM silver.erp_px_cat_g1v2;
+
+
+-- ============================================================================
+-- CRM: Customer Information
+-- ============================================================================
+
+-- Check for Duplicate Customer IDs
+-- Expected Result: No rows
+
+SELECT
+    cst_id,
+    COUNT(*) AS record_count
+FROM silver.crm_cust_info
+GROUP BY cst_id
+HAVING COUNT(*) > 1;
+
+
+-- Check for Unwanted Spaces
+-- Expected Result: No rows
+
+SELECT cst_firstname
+FROM silver.crm_cust_info
+WHERE cst_firstname != TRIM(cst_firstname);
+
+SELECT cst_lastname
+FROM silver.crm_cust_info
+WHERE cst_lastname != TRIM(cst_lastname);
+
+SELECT cst_key
+FROM silver.crm_cust_info
+WHERE cst_key != TRIM(cst_key);
+
+
+-- Review Gender Values
+
+SELECT DISTINCT
+    cst_gndr
+FROM silver.crm_cust_info;
+
+
+-- Check for Empty First Names
+-- Expected Result: No rows
+
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_firstname = '';
+
+
+-- ============================================================================
+-- CRM: Product Information
+-- ============================================================================
+
+-- Check for Duplicate or NULL Product IDs
+-- Expected Result: No rows
+
+SELECT
+    prd_id,
+    COUNT(*) AS record_count
+FROM silver.crm_prd_info
+GROUP BY prd_id
+HAVING COUNT(*) > 1
+    OR prd_id IS NULL;
+
+
+-- Check for Unwanted Spaces
+-- Expected Result: No rows
+
+SELECT prd_nm
+FROM silver.crm_prd_info
+WHERE prd_nm != TRIM(prd_nm);
+
+
+SELECT prd_key
+FROM silver.crm_prd_info
+WHERE prd_key != TRIM(prd_key);
+
+
+-- Check for NULL or Negative Product Cost
+-- Expected Result: No rows
+
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_cost IS NULL
+   OR prd_cost < 0;
+
+
+-- Review Product Line Values
+
+SELECT DISTINCT
+    prd_line
+FROM silver.crm_prd_info;
+
+
+-- Check for Invalid Product Date Order
+-- Expected Result: No rows
+
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_end_dt < prd_start_dt;
+
+
+-- ============================================================================
+-- CRM: Sales Details
+-- ============================================================================
+
+-- Check for Invalid Product Keys
+-- Expected Result: No rows
+
+SELECT
+    sls_ord_num,
+    sls_prd_key,
+    sls_cust_id
+FROM silver.crm_sales_details
+WHERE sls_prd_key NOT IN (
+    SELECT prd_key
+    FROM silver.crm_prd_info
+);
+
+
+-- Check for Invalid Customer IDs
+-- Expected Result: No rows
+
+SELECT
+    sls_ord_num,
+    sls_prd_key,
+    sls_cust_id
+FROM silver.crm_sales_details
+WHERE sls_cust_id NOT IN (
+    SELECT cst_id
+    FROM silver.crm_cust_info
+);
+
+
+-- Check for Invalid Order Dates
+-- Expected Result: No rows
+
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt <= 0
+   OR LENGTH(sls_order_dt) != 8
+   OR sls_order_dt < 19000101
+   OR sls_order_dt > 20500101;
+
+
+-- Check for Invalid Date Order
+-- Expected Result: No rows
+
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt > sls_ship_dt
+   OR sls_order_dt > sls_due_dt;
+
+
+-- Check Sales Business Rules
+-- Sales = Quantity × Price
+-- Sales, Quantity, and Price should be positive
+-- Expected Result: No rows
+
+SELECT DISTINCT
+    sls_sales,
+    sls_quantity,
+    sls_price
+FROM silver.crm_sales_details
+WHERE sls_sales != sls_quantity * sls_price
+   OR sls_sales IS NULL
+   OR sls_quantity IS NULL
+   OR sls_price IS NULL
+   OR sls_sales <= 0
+   OR sls_quantity <= 0
+   OR sls_price <= 0
+ORDER BY
+    sls_sales,
+    sls_quantity,
+    sls_price;
+
+
+-- ============================================================================
+-- ERP: Customer Information
+-- ============================================================================
+
+-- Review Customer ID Standardization
+
+SELECT
+    cid,
+    CASE
+        WHEN cid LIKE 'NAS%' THEN SUBSTRING(cid, 4)
+        ELSE cid
+    END AS standardized_cid,
+    bdate,
+    gen
+FROM silver.erp_cust_az12;
+
+
+-- Check Customer IDs Not Found in CRM
+-- Expected Result: No rows
+
+SELECT
+    cid,
+    CASE
+        WHEN cid LIKE 'NAS%' THEN SUBSTRING(cid, 4)
+        ELSE cid
+    END AS standardized_cid
+FROM silver.erp_cust_az12
+WHERE CASE
+        WHEN cid LIKE 'NAS%' THEN SUBSTRING(cid, 4)
+        ELSE cid
+      END NOT IN (
+          SELECT cst_key
+          FROM silver.crm_cust_info
+      );
+
+
+-- Check for Out-of-Range Birth Dates
+-- Expected Result: No rows
+
+SELECT bdate
+FROM silver.erp_cust_az12
+WHERE bdate < '1900-01-01'
+   OR bdate > CURDATE();
+
+
+-- Review Gender Values
+
+SELECT DISTINCT
+    gen
+FROM silver.erp_cust_az12;
+
+
+-- ============================================================================
+-- ERP: Location
+-- ============================================================================
+
+-- Review Customer ID Formatting
+
+SELECT
+    cid,
+    REPLACE(cid, '-', '') AS standardized_cid,
+    cntry
+FROM silver.erp_loc_a101;
+
+
+-- Review Country Values
+
+SELECT DISTINCT
+    cntry
+FROM silver.erp_loc_a101;
+
+
+-- ============================================================================
+-- ERP: Product Category
+-- ============================================================================
+
+-- Check for Unwanted Spaces
+-- Expected Result: No rows
+
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE cat != TRIM(cat)
+   OR subcat != TRIM(subcat)
+   OR maintenance != TRIM(maintenance);
+
+
+-- Review Category Values
+
+SELECT DISTINCT
+    cat,
+    subcat,
+    maintenance
+FROM silver.erp_px_cat_g1v2;
