@@ -1,10 +1,12 @@
 /*
+-- Note: Compare BRONZE vs. SILVER to ENSURE cleaning did not accidentally 
+
 ===============================================================================
-Bronze Layer: Quality Checks
+Silver Layer: Quality Checks
 ===============================================================================
 Purpose:
     Validate the completeness, consistency, formatting, and integrity of
-    data loaded into the Bronze layer.
+    cleaned data in the Silver layer.
 
 Expected Result:
     Checks should return no unexpected records unless explicitly stated.
@@ -13,8 +15,12 @@ Expected Result:
 
 
 -- ============================================================================
--- Bronze Layer: Row Count Validation
+-- Silver Layer: Row Count Validation
 -- ============================================================================
+
+-- Purpose: Verify total records loaded.
+-- Note: Compare BRONZE vs. SILVER to ENSURE cleaning did not accidentally 
+-- delete a large number of valid records.
 
 SELECT 'crm_cust_info' AS table_name, COUNT(*) AS row_count
 FROM silver.crm_cust_info
