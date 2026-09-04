@@ -1,13 +1,13 @@
-
 /*
 ===============================================================================
 Investigation Queries
 ===============================================================================
 Purpose:
     Contains queries used to investigate data issues, understand data patterns,
-    and determine the required transformations before loading the Silver layer.
+    and identify the transformations and business rules required before
+    loading data into the Silver and Gold layers.
 
-    These queries are used for investigation and development.
+    These queries are used for data exploration, investigation, and development.
 ===============================================================================
 */
 
@@ -17,6 +17,7 @@ Purpose:
 -- ============================================================================
 
 -- Review customer records
+-- Inspect the structure, values, and overall content of customer data
 
 SELECT *
 FROM bronze.crm_cust_info;
@@ -249,3 +250,27 @@ SELECT
     subcat,
     maintenance
 FROM bronze.erp_px_cat_g1v2;
+
+
+-- ============================================================================
+-- GOLD: Customer Information
+-- ============================================================================
+
+-- Investigate CRM and ERP gender combinations
+-- Compare gender values from both sources before applying the integration rule
+
+SELECT 
+    ci.cst_gndr,
+    ca.gen,
+    COUNT(*) AS records
+FROM silver.crm_cust_info AS ci
+LEFT JOIN silver.erp_cust_az12 AS ca
+    ON ci.cst_key = ca.cid
+GROUP BY 
+    ci.cst_gndr,
+    ca.gen
+ORDER BY 
+    ci.cst_gndr,
+    ca.gen;
+    
+
