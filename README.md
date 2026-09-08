@@ -22,7 +22,7 @@ for reporting and analytics.
 The warehouse follows a layered architecture consisting of Bronze, Silver,
 and Gold layers.
 
-![Data Architecture](Data_Analyst_Portfolio_SQL_Project/Docs/data_architechture.png)
+![Data Architecture](Docs/data_architechture.png)
 
 ## Data Sources
 
